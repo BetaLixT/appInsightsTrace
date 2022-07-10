@@ -1,4 +1,4 @@
-package gotrace
+package appinsightstrace
 
 import (
 	"fmt"

@@ -1,9 +1,8 @@
-package gotrace
+package appinsightstrace
 
 import (
 	"time"
 
-	"github.com/BetaLixT/appInsightsTrace/optn"
 	"github.com/microsoft/ApplicationInsights-Go/appinsights"
 
 	"go.uber.org/zap"
@@ -22,7 +21,7 @@ func (insights *AppInsightsCore) Close() {
 }
 
 func NewAppInsightsCore(
-	optn *optn.AppInsightsOptions,
+	optn *AppInsightsOptions,
 	lgr *zap.Logger,
 ) *AppInsightsCore {
 	client := appinsights.NewTelemetryClient(optn.InstrumentationKey)
