@@ -3,12 +3,12 @@ module github.com/BetaLixT/appInsightsTrace
 go 1.18
 
 require (
-	code.cloudfoundry.org/clock v0.0.0-20180518195852-02e53af36e6c // indirect
-	github.com/gofrs/uuid v3.3.0+incompatible // indirect
+	code.cloudfoundry.org/clock v1.0.0 // indirect
+	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/stretchr/testify v1.7.1 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/multierr v1.8.0 // indirect
 )
 
 require (
