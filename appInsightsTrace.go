@@ -107,3 +107,38 @@ func (tracer *AppInsightsTrace) TraceDependency(
 	tele.Tags.Operation().SetParentId(tracer.rid)
 	(*tracer.core.Client).Track(tele)
 }
+
+func (tracer *AppInsightsTrace) TraceDependencyCustom(
+	tid string,
+	rid string,
+	spanId string,
+	dependencyType string,
+	serviceName string,
+	commandName string,
+	success bool,
+	startTimestamp time.Time,
+	eventTimestamp time.Time,
+	fields map[string]string,
+) {
+	props := fields
+
+	tele := &appinsights.RemoteDependencyTelemetry{
+		Id:       spanId,
+		Name:     commandName,
+		Type:     dependencyType,
+		Target:   serviceName,
+		Success:  success,
+		Duration: eventTimestamp.Sub(startTimestamp),
+		BaseTelemetry: appinsights.BaseTelemetry{
+			Timestamp:  startTimestamp,
+			Tags:       make(contracts.ContextTags),
+			Properties: props,
+		},
+		BaseTelemetryMeasurements: appinsights.BaseTelemetryMeasurements{
+			Measurements: make(map[string]float64),
+		},
+	}
+	tele.Tags.Operation().SetId(tid)
+	tele.Tags.Operation().SetParentId(rid)
+	(*tracer.core.Client).Track(tele)
+}
