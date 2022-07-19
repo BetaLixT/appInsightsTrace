@@ -140,5 +140,6 @@ func (tracer *AppInsightsTrace) TraceDependencyCustom(
 	}
 	tele.Tags.Operation().SetId(tid)
 	tele.Tags.Operation().SetParentId(rid)
+	tele.Tags.Operation().SetName(commandName)
 	(*tracer.core.Client).Track(tele)
 }
