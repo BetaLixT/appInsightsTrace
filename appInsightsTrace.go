@@ -49,8 +49,9 @@ func (tracer *AppInsightsTrace) TraceRequest(
 	props["bodySize"] = strconv.Itoa(bodySize)
 	props["ip"] = ip
 	props["userAgent"] = userAgent
+	name := fmt.Sprintf("%s %s", method, path)
 	tele := appinsights.RequestTelemetry{
-		Name:         fmt.Sprintf("%s %s", method, path),
+		Name:         name,
 		Url:          fmt.Sprintf("%s%s", path, query),
 		Id:           tracer.rid,
 		Duration:     eventTimestamp.Sub(startTimestamp),
@@ -68,6 +69,7 @@ func (tracer *AppInsightsTrace) TraceRequest(
 
 	tele.Tags.Operation().SetId(tracer.tid)
 	tele.Tags.Operation().SetParentId(tracer.pid)
+	tele.Tags.Operation().SetName(name)
 
 	(*tracer.core.Client).Track(&tele)
 }
@@ -105,6 +107,7 @@ func (tracer *AppInsightsTrace) TraceDependency(
 	}
 	tele.Tags.Operation().SetId(tracer.tid)
 	tele.Tags.Operation().SetParentId(tracer.rid)
+	tele.Tags.Operation().SetName(commandName)
 	(*tracer.core.Client).Track(tele)
 }
 
