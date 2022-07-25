@@ -90,6 +90,7 @@ func (ins *AppInsightsCore) TraceRequest(
 		},
 	}
 
+  tele.Tags.Cloud().SetRole(ins.ServName)
 	tele.Tags.Operation().SetId(tid)
 	tele.Tags.Operation().SetParentId(pid)
 	tele.Tags.Operation().SetName(name)
@@ -141,5 +142,6 @@ func (ins *AppInsightsCore) TraceDependency(
 	tele.Tags.Operation().SetId(tid)
 	tele.Tags.Operation().SetParentId(rid)
 	tele.Tags.Operation().SetName(commandName)
+	tele.Tags.Cloud().SetRole(ins.ServName)
 	ins.Client.Track(tele)
 }
