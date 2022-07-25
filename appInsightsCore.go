@@ -9,18 +9,18 @@ import (
 	"github.com/microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/microsoft/ApplicationInsights-Go/appinsights/contracts"
 
-	"github.com/soreing/trex"
 	"go.uber.org/zap"
 )
 
 type AppInsightsCore struct {
-	Client       appinsights.TelemetryClient
-	ServName     string
-	traceInfoKey string
+	Client         appinsights.TelemetryClient
+	traceExtractor ITraceExtractor
+	ServName       string
 }
 
 func NewAppInsightsCore(
 	optn *AppInsightsOptions,
+	traceExtractor ITraceExtractor,
 	lgr *zap.Logger,
 ) *AppInsightsCore {
 	client := appinsights.NewTelemetryClient(optn.InstrumentationKey)
@@ -29,9 +29,9 @@ func NewAppInsightsCore(
 		return nil
 	})
 	return &AppInsightsCore{
-		Client:       client,
-		ServName:     optn.ServiceName,
-		traceInfoKey: optn.TraceInfoKey,
+		Client:         client,
+		ServName:       optn.ServiceName,
+		traceExtractor: traceExtractor,
 	}
 }
 
@@ -40,6 +40,12 @@ func (insights *AppInsightsCore) Close() {
 	case <-insights.Client.Channel().Close(10 * time.Second):
 	case <-time.After(30 * time.Second):
 	}
+}
+
+func (ins *AppInsightsCore) ExtractTraceInfo(
+	ctx context.Context,
+) (ver, tid, pid, rid, flg string) {
+	return ins.traceExtractor.ExtractTraceInfo(ctx)
 }
 
 func (ins *AppInsightsCore) TraceRequest(
@@ -55,19 +61,8 @@ func (ins *AppInsightsCore) TraceRequest(
 	eventTimestamp time.Time,
 	fields map[string]string,
 ) {
-	raw := ctx.Value(ins.traceInfoKey)
-	
-	tid := "0000000000000000"
-	pid := "00000000"
-	rid := "00000000"
+	_, tid, pid, rid, _ := ins.traceExtractor.ExtractTraceInfo(ctx)
 
-	if raw != nil {
-		if tr, ok := raw.(trex.TxModel); ok {
-			tid = tr.Tid
-			pid = tr.Pid
-			rid = tr.Rid
-		}
-	}
 	props := fields
 	props["bodySize"] = strconv.Itoa(bodySize)
 	props["ip"] = ip
@@ -90,14 +85,13 @@ func (ins *AppInsightsCore) TraceRequest(
 		},
 	}
 
-  tele.Tags.Cloud().SetRole(ins.ServName)
+	tele.Tags.Cloud().SetRole(ins.ServName)
 	tele.Tags.Operation().SetId(tid)
 	tele.Tags.Operation().SetParentId(pid)
 	tele.Tags.Operation().SetName(name)
 
 	ins.Client.Track(&tele)
 }
-
 
 func (ins *AppInsightsCore) TraceDependency(
 	ctx context.Context,
@@ -110,18 +104,45 @@ func (ins *AppInsightsCore) TraceDependency(
 	eventTimestamp time.Time,
 	fields map[string]string,
 ) {
-	raw := ctx.Value(ins.traceInfoKey)
-	
-	tid := "0000000000000000"
-	rid := "00000000"
+	_, tid, _, rid, _ := ins.traceExtractor.ExtractTraceInfo(ctx)
 
-	if raw != nil {
-		if tr, ok := raw.(trex.TxModel); ok {
-			tid = tr.Tid
-			rid = tr.Rid
-		}
+	props := fields
+	tele := &appinsights.RemoteDependencyTelemetry{
+		Id:       spanId,
+		Name:     commandName,
+		Type:     dependencyType,
+		Target:   serviceName,
+		Success:  success,
+		Duration: eventTimestamp.Sub(startTimestamp),
+		BaseTelemetry: appinsights.BaseTelemetry{
+			Timestamp:  startTimestamp,
+			Tags:       make(contracts.ContextTags),
+			Properties: props,
+		},
+		BaseTelemetryMeasurements: appinsights.BaseTelemetryMeasurements{
+			Measurements: make(map[string]float64),
+		},
 	}
-	
+	tele.Tags.Operation().SetId(tid)
+	tele.Tags.Operation().SetParentId(rid)
+	tele.Tags.Operation().SetName(commandName)
+	tele.Tags.Cloud().SetRole(ins.ServName)
+	ins.Client.Track(tele)
+}
+
+func (ins *AppInsightsCore) TraceDependencyWithIds(
+	tid string,
+	rid string,
+	spanId string,
+	dependencyType string,
+	serviceName string,
+	commandName string,
+	success bool,
+	startTimestamp time.Time,
+	eventTimestamp time.Time,
+	fields map[string]string,
+) {
+
 	props := fields
 	tele := &appinsights.RemoteDependencyTelemetry{
 		Id:       spanId,
