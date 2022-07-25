@@ -66,7 +66,7 @@ func (tracer *AppInsightsTrace) TraceRequest(
 			Measurements: make(map[string]float64),
 		},
 	}
-
+  tele.Tags.Cloud().SetRole(tracer.core.ServName)
 	tele.Tags.Operation().SetId(tracer.tid)
 	tele.Tags.Operation().SetParentId(tracer.pid)
 	tele.Tags.Operation().SetName(name)
@@ -105,6 +105,7 @@ func (tracer *AppInsightsTrace) TraceDependency(
 			Measurements: make(map[string]float64),
 		},
 	}
+	tele.Tags.Cloud().SetRole(tracer.core.ServName)
 	tele.Tags.Operation().SetId(tracer.tid)
 	tele.Tags.Operation().SetParentId(tracer.rid)
 	tele.Tags.Operation().SetName(commandName)
@@ -141,6 +142,7 @@ func (tracer *AppInsightsTrace) TraceDependencyCustom(
 			Measurements: make(map[string]float64),
 		},
 	}
+	tele.Tags.Cloud().SetRole(tracer.core.ServName)
 	tele.Tags.Operation().SetId(tid)
 	tele.Tags.Operation().SetParentId(rid)
 	tele.Tags.Operation().SetName(commandName)
