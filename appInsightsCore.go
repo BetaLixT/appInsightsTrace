@@ -186,6 +186,59 @@ func (ins *AppInsightsCore) TraceRequest(
 
 
 
+// Transmits a new Request telemtery for events, this should be used to trace incoming
+// events (from a middleware for example).
+//
+// ctx: the current context of the execution, the ITraceExtractor.ExtractTraceInfo
+//   function will be utilized to extract traceId parentId and current requestId
+//   from the context the default implementation of ITraceExtractor provided in
+//   this package will leave these fields empty
+// name: the custom name of the trace
+// key: the routing key of the event
+// statusCode: the response http status code (https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
+// startTimestamp: timestamp of when the event was received by this service
+// eventTimestamp: timestamp of when the event has completed processing by this
+//   service
+func (ins *AppInsightsCore) TraceEvent(
+	ctx context.Context,
+	name string,
+	key string,
+	statusCode int,
+	startTimestamp time.Time,
+	eventTimestamp time.Time,
+	fields map[string]string,
+) {
+	_, tid, pid, rid, _ := ins.traceExtractor.ExtractTraceInfo(ctx)
+
+	props := fields
+	name := fmt.Sprintf("%s %s", name, key)
+	tele := appinsights.RequestTelemetry{
+		Name:         name,
+		Url:          key,
+		Id:           rid,
+		Duration:     eventTimestamp.Sub(startTimestamp),
+		ResponseCode: strconv.Itoa(statusCode),
+		Success:      statusCode > 99 && statusCode < 300,
+		BaseTelemetry: appinsights.BaseTelemetry{
+			Timestamp:  startTimestamp,
+			Tags:       make(contracts.ContextTags),
+			Properties: props,
+		},
+		BaseTelemetryMeasurements: appinsights.BaseTelemetryMeasurements{
+			Measurements: make(map[string]float64),
+		},
+	}
+
+	tele.Tags.Cloud().SetRole(ins.ServName)
+	tele.Tags.Operation().SetId(tid)
+	tele.Tags.Operation().SetParentId(pid)
+	tele.Tags.Operation().SetName(name)
+
+	ins.Client.Track(&tele)
+}
+
+
+
 // Transmits a new Dependency telemtery, this should be used to trace outgoing
 // requests, database calls etc.
 //
@@ -391,6 +444,61 @@ func (ins *AppInsightsCore) TraceRequestWithIds(
 
 	ins.Client.Track(&tele)
 }
+
+
+// Transmits a new Request telemtery for events, this should be used to trace incoming
+// events (from a middleware for example).
+//
+// traceId: is a common identifier for all dependents and dependencies for the
+//   request, can be left as an empty string but this would reduce tracablility
+// parentId is and id unique to the current request's direct dependent, can be left
+//   as an empty string but this would reduce tracablility
+// requestId is the unique Id for the request, generated at the start of the
+//   request, can be left as an empty string but this would reduce tracablility
+// name: the custom name of the trace
+// key: the routing key of the event
+// statusCode: the response http status code (https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
+// startTimestamp: timestamp of when the event was received by this service
+// eventTimestamp: timestamp of when the event has completed processing by this
+//   service
+func (ins *AppInsightsCore) TraceEventWithIds(
+	traceId string,
+	parentId string,
+	requestId string,
+	name string,
+	key string,
+	statusCode int,
+	startTimestamp time.Time,
+	eventTimestamp time.Time,
+	fields map[string]string,
+) {
+	props := fields
+	name := fmt.Sprintf("%s %s", name, key)
+	tele := appinsights.RequestTelemetry{
+		Name:         name,
+		Url:          key,
+		Id:           requestId,
+		Duration:     eventTimestamp.Sub(startTimestamp),
+		ResponseCode: strconv.Itoa(statusCode),
+		Success:      statusCode > 99 && statusCode < 300,
+		BaseTelemetry: appinsights.BaseTelemetry{
+			Timestamp:  startTimestamp,
+			Tags:       make(contracts.ContextTags),
+			Properties: props,
+		},
+		BaseTelemetryMeasurements: appinsights.BaseTelemetryMeasurements{
+			Measurements: make(map[string]float64),
+		},
+	}
+
+	tele.Tags.Cloud().SetRole(ins.ServName)
+	tele.Tags.Operation().SetId(traceId)
+	tele.Tags.Operation().SetParentId(parentId)
+	tele.Tags.Operation().SetName(name)
+
+	ins.Client.Track(&tele)
+}
+
 
 
 // Transmits a new Dependency telemtery, this should be used to trace outgoing
