@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/microsoft/ApplicationInsights-Go/appinsights"
@@ -181,6 +182,135 @@ func (ins *AppInsightsCore) TraceRequest(
 	tele.Tags.Cloud().SetRole(ins.ServName)
 	tele.Tags.Operation().SetId(tid)
 	tele.Tags.Operation().SetParentId(pid)
+	tele.Tags.Operation().SetName(name)
+
+	ins.Client.Track(&tele)
+}
+
+// - Context dependent
+
+// Transmits a new PageView telemtery, this should be used to trace incoming
+// Page Views should your application be a web application serving html pages
+//
+// ctx: the current context of the execution, the ITraceExtractor.ExtractTraceInfo
+//
+// function will be utilized to extract traceId parentId and current requestId
+// from the context the default implementation of ITraceExtractor provided in
+// this package will leave these fields empty
+//
+// path: the path for the request (ex: /Home)
+// statusCode: the response http status code
+// (https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
+// bodySize: the size of the response body
+// ip: ip of the client making the request
+// userAgent: the user agent of the client making the request
+// (https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/User-Agent)
+// startTimestamp: timestamp of when the request was received by this service
+// eventTimestamp: timestamp of when the request has completed processing by this
+// service
+// fields: additional custom values to include in the telemetry
+func (ins *AppInsightsCore) TracePageView(
+	ctx context.Context,
+	path string,
+	statusCode int,
+	bodySize int,
+	ip string,
+	userAgent string,
+	startTimestamp time.Time,
+	eventTimestamp time.Time,
+	fields map[string]string,
+) {
+	_, tid, pid, _, _ := ins.traceExtractor.ExtractTraceInfo(ctx)
+
+	props := fields
+	props["bodySize"] = strconv.Itoa(bodySize)
+	props["ip"] = ip
+	props["userAgent"] = userAgent
+	bldr := strings.Builder{} // look i did the abbreviation thing
+	bldr.WriteString("GET ")
+	bldr.WriteString(path)
+	name := bldr.String()
+	tele := appinsights.PageViewTelemetry{
+		Name:     name,
+		Url:      path,
+		Duration: eventTimestamp.Sub(startTimestamp),
+		BaseTelemetry: appinsights.BaseTelemetry{
+			Timestamp:  startTimestamp,
+			Tags:       make(contracts.ContextTags),
+			Properties: props,
+		},
+		BaseTelemetryMeasurements: appinsights.BaseTelemetryMeasurements{
+			Measurements: make(map[string]float64),
+		},
+	}
+
+	tele.Tags.Cloud().SetRole(ins.ServName)
+	tele.Tags.Operation().SetId(tid)
+	tele.Tags.Operation().SetParentId(pid)
+	tele.Tags.Operation().SetName(name)
+
+	ins.Client.Track(&tele)
+}
+
+// - Context Independent
+
+// Transmits a new PageView telemtery, this should be used to trace incoming
+// Page Views should your application be a web application serving html pages
+// it uses the provied traceId, parentId and requestId instead of trying
+// to extract the same from the context.The said IDs follow the W3C
+// trace-context spec (https://www.w3.org/TR/trace-context/).
+//
+// traceId: is a common identifier for all dependents and dependencies for the
+// parentId: is and id unique to the current request's direct dependent, can be left
+//
+//	as an empty string but this would reduce tracablility
+//
+// path: the path for the request (ex: /api/v1/weather)
+// statusCode: the response http status code (https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
+// bodySize: the size of the response body
+// ip: ip of the client making the request
+// userAgent: the user agent of the client making the request (https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/User-Agent)
+// startTimestamp: timestamp of when the request was received by this service
+// eventTimestamp: timestamp of when the request has completed processing by this
+// service
+// fields: additional custom values to include in the telemetry
+func (ins *AppInsightsCore) TracePageViewWithIds(
+	traceId string,
+	parentId string,
+	path string,
+	statusCode int,
+	bodySize int,
+	ip string,
+	userAgent string,
+	startTimestamp time.Time,
+	eventTimestamp time.Time,
+	fields map[string]string,
+) {
+	props := fields
+	props["bodySize"] = strconv.Itoa(bodySize)
+	props["ip"] = ip
+	props["userAgent"] = userAgent
+	bldr := strings.Builder{} // look i did the abbreviation thing
+	bldr.WriteString("GET ")
+	bldr.WriteString(path)
+	name := bldr.String()
+	tele := appinsights.PageViewTelemetry{
+		Name:     name,
+		Url:      path,
+		Duration: eventTimestamp.Sub(startTimestamp),
+		BaseTelemetry: appinsights.BaseTelemetry{
+			Timestamp:  startTimestamp,
+			Tags:       make(contracts.ContextTags),
+			Properties: props,
+		},
+		BaseTelemetryMeasurements: appinsights.BaseTelemetryMeasurements{
+			Measurements: make(map[string]float64),
+		},
+	}
+
+	tele.Tags.Cloud().SetRole(ins.ServName)
+	tele.Tags.Operation().SetId(traceId)
+	tele.Tags.Operation().SetParentId(parentId)
 	tele.Tags.Operation().SetName(name)
 
 	ins.Client.Track(&tele)
@@ -436,7 +566,6 @@ func (ins *AppInsightsCore) TraceRequestWithIds(
 	eventTimestamp time.Time,
 	fields map[string]string,
 ) {
-
 	props := fields
 	props["bodySize"] = strconv.Itoa(bodySize)
 	props["ip"] = ip
@@ -569,7 +698,6 @@ func (ins *AppInsightsCore) TraceDependencyWithIds(
 	eventTimestamp time.Time,
 	fields map[string]string,
 ) {
-
 	props := fields
 	tele := &appinsights.RemoteDependencyTelemetry{
 		Id:       spanId,
@@ -620,7 +748,6 @@ func (ins *AppInsightsCore) TraceLogWithIds(
 	timestamp time.Time,
 	fields map[string]string,
 ) {
-
 	props := fields
 	tele := &appinsights.TraceTelemetry{
 		Message:       message,
@@ -664,7 +791,6 @@ func (ins *AppInsightsCore) TraceExceptionWithIds(
 	skip int,
 	fields map[string]string,
 ) {
-
 	props := fields
 	tele := &appinsights.ExceptionTelemetry{
 		Error:         err,
