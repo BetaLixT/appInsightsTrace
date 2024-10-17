@@ -75,7 +75,12 @@ func NewAppInsightsCore(
 	traceExtractor ITraceExtractor,
 	lgr *zap.Logger,
 ) *AppInsightsCore {
-	client := appinsights.NewTelemetryClient(optn.InstrumentationKey)
+	cfg := appinsights.NewTelemetryConfiguration(optn.InstrumentationKey)
+	if optn.IngestionEndpoint != "" {
+		cfg.EndpointUrl = optn.IngestionEndpoint
+	}
+
+	client := appinsights.NewTelemetryClientFromConfig(cfg)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		lgr.Info(msg)
 		return nil
